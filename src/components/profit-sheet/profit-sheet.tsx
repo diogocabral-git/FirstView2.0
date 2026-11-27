@@ -4,7 +4,7 @@ import { Fragment, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Share2, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  computeDay, daysInMonth, defaultFeeSettings, feesFor, FEES_KEY, isIncomplete, isTracked, mockMonth, monthStorageKey, sumDays, weekday,
+  computeDay, daysInMonth, defaultFeeSettings, feesFor, FEES_KEY, isIncomplete, isTracked, blankMonth, monthStorageKey, sumDays, weekday,
   type DayInput, type DayResult, type FeeSettings, type Totals,
 } from "@/lib/profit-sheet";
 import { useMounted, useStore } from "@/lib/store";
@@ -104,7 +104,7 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
   const readOnly = !!shared;
   const [today] = useState(todayInLisbon);
   const [ym, setYm] = useState(() => (shared ? { y: shared.y, m: shared.m } : { y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 }));
-  const monthFallback = useMemo(() => () => mockMonth(ym.y, ym.m, today), [ym, today]);
+  const monthFallback = useMemo(() => () => blankMonth(ym.y, ym.m), [ym]);
   const [storedDays, setDays] = useStore<DayInput[]>(monthStorageKey(ym.y, ym.m), monthFallback);
   const [storedFees, setFeesState] = useStore<FeeSettings>(FEES_KEY, feesFallback);
   const days = shared ? shared.days : storedDays;
@@ -146,9 +146,9 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
     const d = new Date(Date.UTC(ym.y, ym.m - 1, 1));
     const key = monthStorageKey(d.getUTCFullYear(), d.getUTCMonth());
     const raw = localStorage.getItem(key);
-    const all: DayInput[] = raw ? JSON.parse(raw) : mockMonth(d.getUTCFullYear(), d.getUTCMonth(), today);
+    const all: DayInput[] = raw ? JSON.parse(raw) : blankMonth(d.getUTCFullYear(), d.getUTCMonth());
     return sumDays(all.slice(0, Math.max(totals.days, 1)), fees);
-  }, [ym, today, totals.days, fees]);
+  }, [ym, totals.days, fees]);
 
   const breakEven = useMemo(() => {
     if (!totals.adSpend) return null;
@@ -419,6 +419,7 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
                                   label={`${c.label} ${d.date}`}
                                   value={d[c.input.field]}
                                   fallback={c.input.field === "txFee" && tracked ? r.txFee : undefined}
+                                  flagMissing={tracked && c.input.field !== "gross"}
                                   source={c.input.source}
                                   disabled={(c.input.field === "adsMeta" && !fees.metaEnabled) || (c.input.field === "adsGoogle" && !fees.googleEnabled)}
                                   onChange={(v) => updateDay(d.date, { [c.input!.field]: v })}

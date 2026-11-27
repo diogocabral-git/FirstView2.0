@@ -29,35 +29,11 @@ export type Subscription = {
   scope: "business" | string;
 };
 
-export const EXPENSES_KEY = "fv.expenses";
-export const SUBSCRIPTIONS_KEY = "fv.subscriptions";
+export const EXPENSES_KEY = "fv.v2.expenses";
+export const SUBSCRIPTIONS_KEY = "fv.v2.subscriptions";
 
-export function mockExpenses(today: string): Expense[] {
-  const y = Number(today.slice(0, 4));
-  const m = Number(today.slice(5, 7)) - 1;
-  const out: Expense[] = [];
-  for (let back = 0; back < 6; back++) {
-    const d = new Date(Date.UTC(y, m - back, 1));
-    const yy = d.getUTCFullYear();
-    const mm = d.getUTCMonth();
-    const day = (n: number) => isoDate(yy, mm, Math.min(n, daysInMonth(yy, mm)));
-    out.push(
-      { id: `e-${back}-1`, category: "operations", description: "Software", amount: 120 + back * 15, date: day(5), scope: "business" },
-      { id: `e-${back}-2`, category: "team", description: "Editor de vídeo (freelancer)", amount: 180, date: day(12), scope: "business" },
-    );
-    if (back % 2 === 0) out.push({ id: `e-${back}-3`, category: "extra", description: "Amostras de produto", amount: 65, date: day(20), scope: "business" });
-  }
-  return out.filter((e) => e.date <= today);
-}
-
-export function mockSubscriptions(today: string): Subscription[] {
-  const start = `${Number(today.slice(0, 4)) - 1}-01-10`;
-  return [
-    { id: "s-1", name: "Shopify", category: "operations", amount: 39, cycle: "monthly", startDate: start, endDate: null, scope: "business" },
-    { id: "s-2", name: "Tema da loja", category: "operations", amount: 29, cycle: "monthly", startDate: start, endDate: null, scope: "business" },
-    { id: "s-3", name: "Canva Pro", category: "operations", amount: 12, cycle: "monthly", startDate: start, endDate: null, scope: "business" },
-  ];
-}
+export const initialExpenses = (): Expense[] => [];
+export const initialSubscriptions = (): Subscription[] => [];
 
 /** A subscrição conta neste mês? (mensal: todos os meses; anual: no mês de aniversário) */
 export function subscriptionChargeInMonth(s: Subscription, y: number, m: number): number {

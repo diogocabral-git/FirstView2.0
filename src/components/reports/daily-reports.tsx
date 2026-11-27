@@ -6,8 +6,8 @@ import { toBlob, toPng } from "html-to-image";
 import { cn } from "@/lib/utils";
 import { useMounted, useStore, readStore } from "@/lib/store";
 import { addDays, asDate, dayShort, MONTHS_LONG, todayInLisbon, WEEKDAYS_LONG, weekdayShort } from "@/lib/dates";
-import { emptyReport, mockReports, REPORTS_KEY, type DailyReport } from "@/lib/daily-reports";
-import { computeDay, defaultFeeSettings, FEES_KEY, isTracked, mockMonth, monthStorageKey, type DayInput, type FeeSettings } from "@/lib/profit-sheet";
+import { emptyReport, initialReports, REPORTS_KEY, type DailyReport } from "@/lib/daily-reports";
+import { computeDay, defaultFeeSettings, FEES_KEY, isTracked, blankMonth, monthStorageKey, type DayInput, type FeeSettings } from "@/lib/profit-sheet";
 import { fmtMoney } from "@/components/profit-sheet/format";
 
 type NumKey = "atc" | "reachedCheckout" | "cvr" | "cpc" | "ctr" | "cpm";
@@ -36,12 +36,12 @@ const texts: { key: TextKey; label: string; placeholder: string; rows?: number }
 const num = (v: number | null, unit: string) =>
   v === null ? "—" : `${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${unit === "%" ? "%" : " €"}`;
 
-const reportsFallback = () => mockReports(todayInLisbon());
+const reportsFallback = () => initialReports();
 
 function profitSheetDay(date: string): DayInput | undefined {
   const y = Number(date.slice(0, 4));
   const m = Number(date.slice(5, 7)) - 1;
-  return readStore(monthStorageKey(y, m), () => mockMonth(y, m, todayInLisbon())).find((d) => d.date === date);
+  return readStore(monthStorageKey(y, m), () => blankMonth(y, m)).find((d) => d.date === date);
 }
 
 export function DailyReports() {

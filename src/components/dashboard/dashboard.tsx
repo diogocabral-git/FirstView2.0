@@ -159,6 +159,7 @@ function Analytics({ today }: { today: string }) {
 
   const bestWd = data.weekdays.reduce((a, b) => (b.profit > a.profit ? b : a));
   const worstWd = data.weekdays.reduce((a, b) => (b.profit < a.profit ? b : a));
+  const hasWeekdayData = data.weekdays.some((w) => w.rev !== 0);
 
   return (
     <div className="space-y-4">
@@ -202,7 +203,7 @@ function Analytics({ today }: { today: string }) {
             </select>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-            <MiniStat label="Melhor mês" value={`${best.label} · ${formatCurrency(best[metric] ?? 0, { compact: true })}`} />
+            <MiniStat label="Melhor mês" value={withData.length ? `${best.label} · ${formatCurrency(best[metric] ?? 0, { compact: true })}` : "—"} />
             <MiniStat label="Média mensal" value={`${formatCurrency(avg, { compact: true })} · ${withData.length} meses`} />
             <MiniStat label={`Acumulado ${today.slice(0, 4)}`} value={fmtMoney(ytd)} />
           </div>
@@ -320,9 +321,13 @@ function Analytics({ today }: { today: string }) {
             <h3 className="font-semibold">Por dia da semana</h3>
             <span className="text-xs text-muted-foreground">lucro médio · 90 dias</span>
           </div>
-          <p className="mt-3 text-sm">
-            Melhor dia: <b className="text-emerald-400">{bestWd.name}</b> · pior dia: <b className="text-red-400">{worstWd.name}</b>
-          </p>
+          {hasWeekdayData ? (
+            <p className="mt-3 text-sm">
+              Melhor dia: <b className="text-emerald-400">{bestWd.name}</b> · pior dia: <b className="text-red-400">{worstWd.name}</b>
+            </p>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">Ainda sem dados na Profit Sheet.</p>
+          )}
           <div className="mt-2 h-44">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.weekdays} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
@@ -332,7 +337,7 @@ function Analytics({ today }: { today: string }) {
                 <Tooltip cursor={{ fill: "var(--muted)" }} contentStyle={tooltipStyle} formatter={(v, n) => [fmtMoney(Number(v)), n === "profit" ? "Lucro médio" : "Receita média"]} />
                 <Bar dataKey="profit" radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false}>
                   {data.weekdays.map((w) => (
-                    <Cell key={w.label} fill={w.name === bestWd.name ? "#34d399" : w.name === worstWd.name ? "#f87171" : "var(--primary)"} />
+                    <Cell key={w.label} fill={hasWeekdayData && w.name === bestWd.name ? "#34d399" : hasWeekdayData && w.name === worstWd.name ? "#f87171" : "var(--primary)"} />
                   ))}
                 </Bar>
               </BarChart>

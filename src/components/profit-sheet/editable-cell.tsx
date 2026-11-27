@@ -28,12 +28,14 @@ type Props = {
   label: string;
   /** Valor calculado mostrado quando a célula está vazia (ex.: taxa de transação pela %). */
   fallback?: number;
+  /** Realçar a célula se estiver vazia (só nos dias já começados). */
+  flagMissing?: boolean;
 };
 
 /** Célula com "€" que se pode editar. Grava ao sair do campo ou ao carregar Enter. */
-export function EditableCell({ value, onChange, source = "manual", disabled, label, fallback }: Props) {
+export function EditableCell({ value, onChange, source = "manual", disabled, label, fallback, flagMissing = true }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
-  const missing = value === null && !disabled && fallback === undefined;
+  const missing = flagMissing && value === null && !disabled && fallback === undefined;
   const src = sourceStyle[source];
 
   function commit() {

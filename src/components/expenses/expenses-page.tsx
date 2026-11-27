@@ -7,7 +7,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { useMounted, useStore } from "@/lib/store";
 import { MONTHS_LONG, MONTHS_SHORT, shiftMonth, todayInLisbon } from "@/lib/dates";
 import {
-  EXPENSES_KEY, expenseCategories, mockExpenses, mockSubscriptions, monthExpenses, subscriptionChargeInMonth, SUBSCRIPTIONS_KEY,
+  EXPENSES_KEY, expenseCategories, initialExpenses, initialSubscriptions, monthExpenses, subscriptionChargeInMonth, SUBSCRIPTIONS_KEY,
   type Expense, type ExpenseCategory, type Subscription,
 } from "@/lib/expenses";
 import { isoDate } from "@/lib/profit-sheet";
@@ -25,8 +25,8 @@ export function ExpensesPage() {
 function ExpensesInner() {
   const [today] = useState(todayInLisbon);
   const [ym, setYm] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 }));
-  const expFallback = useMemo(() => () => mockExpenses(today), [today]);
-  const subFallback = useMemo(() => () => mockSubscriptions(today), [today]);
+  const expFallback = useMemo(() => initialExpenses, []);
+  const subFallback = useMemo(() => initialSubscriptions, []);
   const [expenses, setExpenses] = useStore<Expense[]>(EXPENSES_KEY, expFallback);
   const [subs, setSubs] = useStore<Subscription[]>(SUBSCRIPTIONS_KEY, subFallback);
   const [adding, setAdding] = useState<ExpenseCategory | null>(null);

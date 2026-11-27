@@ -35,7 +35,7 @@ export type FeeSettings = {
 };
 
 export const defaultFeeSettings: FeeSettings = {
-  periods: [{ from: null, metaAgencyPct: 0, googleAgencyPct: 10, txPct: 2.9, cashbackPct: 2, cashbackOn: "both" }],
+  periods: [{ from: null, metaAgencyPct: 0, googleAgencyPct: 0, txPct: 0, cashbackPct: 0, cashbackOn: "both" }],
   metaEnabled: true,
   googleEnabled: true,
 };
@@ -179,17 +179,7 @@ export function weekday(date: string) {
   return new Date(`${date}T12:00:00Z`).getUTCDay(); // 0 = domingo
 }
 
-// ---------- dados de exemplo ----------
-
-function seeded(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-}
-
-const round2 = (v: number) => Math.round(v * 100) / 100;
+// ---------- mês vazio ----------
 
 export function emptyDay(date: string): DayInput {
   return {
@@ -198,54 +188,12 @@ export function emptyDay(date: string): DayInput {
   };
 }
 
-const MOCK_MONTHS_BACK = 7; // dados de exemplo desde há 7 meses
-
-/** Gera um mês de exemplo, com dados até ao dia anterior a `today`. */
-export function mockMonth(year: number, month: number, today: string): DayInput[] {
-  const total = daysInMonth(year, month);
-  const ty = Number(today.slice(0, 4));
-  const tm = Number(today.slice(5, 7)) - 1;
-  const monthsAgo = (ty - year) * 12 + (tm - month);
-  const scale = monthsAgo > MOCK_MONTHS_BACK ? 0 : 0.45 + 0.55 * (1 - monthsAgo / MOCK_MONTHS_BACK);
-  const out: DayInput[] = [];
-  for (let day = 1; day <= total; day++) {
-    const date = isoDate(year, month, day);
-    if (date >= today || scale === 0) {
-      out.push(emptyDay(date));
-      continue;
-    }
-    const rnd = seeded(year * 10000 + (month + 1) * 100 + day);
-    const wd = weekday(date);
-    const weekdayBoost = [0.9, 0.85, 0.95, 1.05, 1.15, 1.05, 0.95][wd];
-    const gross = round2((450 + rnd() * 1600) * scale * weekdayBoost);
-    const orders = Math.max(1, Math.round(gross / (48 + rnd() * 14)));
-    const discounts = round2(gross * (0.07 + rnd() * 0.05));
-    const reversals = rnd() < 0.15 ? round2(20 + rnd() * 80 * scale) : 0;
-    const net = gross - discounts - reversals;
-    const adsGoogle = round2(net * (0.25 + rnd() * 0.45));
-    const checkout = round2(1.3 + rnd() * 1.6);
-    const recent = monthsAgo === 0;
-    out.push({
-      date,
-      gross,
-      discounts,
-      reversals,
-      orders,
-      // alguns dias recentes sem custo preenchido, para mostrar "incompleto"
-      cogs: recent && day % 9 === 4 ? null : round2(net * (0.29 + rnd() * 0.1)),
-      adsMeta: 0,
-      adsGoogle,
-      txFee: null, // calculada a partir da % do fornecedor de pagamentos
-      atc: round2(2.6 + rnd() * 2.4),
-      checkout,
-      cvr: round2(checkout * (0.45 + rnd() * 0.25)),
-      note: "",
-    });
-  }
-  return out;
+/** Mês sem dados (todos os dias por preencher). */
+export function blankMonth(year: number, month: number): DayInput[] {
+  return Array.from({ length: daysInMonth(year, month) }, (_, i) => emptyDay(isoDate(year, month, i + 1)));
 }
 
 // ---------- acesso aos dados (demo: localStorage) ----------
 
-export const monthStorageKey = (y: number, m: number) => `fv.ps.${y}-${String(m + 1).padStart(2, "0")}`;
-export const FEES_KEY = "fv.ps.fees";
+export const monthStorageKey = (y: number, m: number) => `fv.v2.ps.${y}-${String(m + 1).padStart(2, "0")}`;
+export const FEES_KEY = "fv.v2.ps.fees";
