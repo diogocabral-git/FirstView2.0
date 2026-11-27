@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, FileSpreadsheet, Wallet, Rss,
-  Eye, Undo2, CreditCard, ShieldAlert, ListTodo, Plug,
+  Eye, Undo2, CreditCard, ShieldAlert, ListTodo, Plug, CalendarDays, CalendarRange, CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -29,6 +29,14 @@ export const navigation: NavGroup[] = [
       { label: "Reembolsos", href: "/refunds", icon: Undo2, description: "Reembolsos sincronizados da Shopify." },
       { label: "Chargebacks", href: "/chargebacks", icon: CreditCard, description: "Chargebacks recebidos, valores e prazos de resposta." },
       { label: "Disputas", href: "/disputes", icon: ShieldAlert, description: "Disputas de pagamento abertas e respetivo estado." },
+    ],
+  },
+  {
+    label: "Reports",
+    items: [
+      { label: "Daily Reports", href: "/daily-reports", icon: CalendarClock, description: "Resumo de cada dia: vendas, anúncios, lucro e reembolsos." },
+      { label: "Week Reports", href: "/week-reports", icon: CalendarRange, description: "Resumo semanal e comparação com a semana anterior." },
+      { label: "Monthly Reports", href: "/monthly-reports", icon: CalendarDays, description: "Fecho mensal: receita, custos, lucro e margem." },
     ],
   },
   {
