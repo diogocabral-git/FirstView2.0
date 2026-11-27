@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 function greetingFor(hour: number) {
+  if (hour < 6) return "Boa noite";
   if (hour < 12) return "Bom dia";
   if (hour < 20) return "Boa tarde";
   return "Boa noite";
