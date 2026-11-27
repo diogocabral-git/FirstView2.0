@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, Search } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 
 export function Topbar() {
   return (
@@ -10,9 +10,6 @@ export function Topbar() {
         </select>
       </div>
       <div className="flex items-center gap-2">
-        <button className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm">
-          <CalendarDays className="size-4" /> Este mês
-        </button>
         <button aria-label="Pesquisar" className="rounded-lg p-2 text-muted-foreground hover:bg-muted">
           <Search className="size-4" />
         </button>

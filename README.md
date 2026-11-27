@@ -4,7 +4,18 @@ Plataforma web para acompanhar os dados do negócio de e-commerce num só sítio
 
 ![Dashboard](docs/dashboard.png)
 
-> Estado atual: estrutura base. O dashboard mostra **dados de exemplo** (`src/lib/mock-data.ts`) e as restantes secções estão marcadas como "em construção". O design será ajustado mais tarde.
+> Estado atual: as páginas abaixo já funcionam com **dados de exemplo**, guardados no browser (`src/lib/store.ts`) até o Supabase estar ligado. As restantes secções estão marcadas como "em construção".
+
+## Páginas
+
+| Página | O que faz |
+|---|---|
+| Dashboard | KPIs por período (este mês, 7/30/90 dias), 12 meses (receita, lucro ou COGS) com melhor mês, média e acumulado do ano, estrutura de custos, reembolsos (taxa e por semana), despesas do mês, lucro médio por dia da semana |
+| Command Center | Cumprimento dos últimos 30 dias (Daily Reports e Profit Sheet), consistência (dias com lucro, sequências) e alertas |
+| Profit Sheet | Tabela diária editável, subtotais semanais, taxas com data de início ou correção de todo o histórico (agências, transação, cashback Meta/Google), filtros e link de partilha só de leitura |
+| Despesas | Despesas por categoria (operacional, equipa, pessoal, extra), subscrições mensais/anuais e evolução mensal |
+| Daily Reports | Report diário em 2 passos (métricas e o teu dia) com comparação com ontem e imagem para copiar para o WhatsApp |
+| Week / Monthly Reports | Resumo por semana ou mês: receita, custos, ROAS, lucro, reembolsos, despesas, lucro final e reports enviados |
 
 ## Tecnologias
 
@@ -47,7 +58,9 @@ src/
     ui/                    componentes base (Card, Badge)
   lib/
     nav.ts                 itens do menu lateral
-    mock-data.ts           dados de exemplo
+    store.ts / data.ts     dados guardados no browser (demo) e leitura partilhada
+    profit-sheet.ts        cálculos da Profit Sheet
+    expenses.ts, daily-reports.ts, period-stats.ts
     supabase/              clientes Supabase (browser, servidor, service role)
     integrations/          Shopify, Meta Ads, Google Ads, Gmail (um módulo cada)
   proxy.ts                 renova a sessão e protege as páginas (quando o Supabase está configurado)

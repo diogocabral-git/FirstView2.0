@@ -18,24 +18,44 @@ export type DayInput = {
   note: string;
 };
 
-export type Fees = {
+/** Taxas em vigor a partir de uma data (`from` = null: desde sempre). */
+export type FeePeriod = {
+  from: string | null;
   metaAgencyPct: number;
   googleAgencyPct: number;
+  txPct: number; // taxa de transação do fornecedor de pagamentos (% da receita bruta)
   cashbackPct: number; // cashback do cartão sobre o gasto em anúncios
+  cashbackOn: "both" | "meta" | "google";
+};
+
+export type FeeSettings = {
+  periods: FeePeriod[]; // ordenadas por `from`
   metaEnabled: boolean;
   googleEnabled: boolean;
 };
 
-export const defaultFees: Fees = {
-  metaAgencyPct: 0,
-  googleAgencyPct: 10,
-  cashbackPct: 2,
+export const defaultFeeSettings: FeeSettings = {
+  periods: [{ from: null, metaAgencyPct: 0, googleAgencyPct: 10, txPct: 2.9, cashbackPct: 2, cashbackOn: "both" }],
   metaEnabled: true,
   googleEnabled: true,
 };
 
+export function feesFor(s: FeeSettings, date: string): FeePeriod {
+  let current = s.periods[0];
+  for (const p of s.periods) if (p.from === null || p.from <= date) current = p;
+  return current;
+}
+
+/** "A partir de um dia": novas taxas a partir de `from`. "Corrigir todo o histórico": from = null. */
+export function applyFees(s: FeeSettings, period: FeePeriod): FeeSettings {
+  if (period.from === null) return { ...s, periods: [period] };
+  const kept = s.periods.filter((p) => p.from === null || p.from < period.from!);
+  return { ...s, periods: [...kept, period] };
+}
+
 export type DayResult = {
   netRev: number;
+  txFee: number;
   aov: number | null;
   cogPct: number | null;
   adsMeta: number;
@@ -57,28 +77,27 @@ export function isTracked(d: DayInput) {
   return d.gross !== null;
 }
 
-export function isIncomplete(d: DayInput, fees: Fees) {
+export function isIncomplete(d: DayInput, s: FeeSettings) {
   if (!isTracked(d)) return false;
-  return (
-    d.cogs === null ||
-    d.txFee === null ||
-    (fees.metaEnabled && d.adsMeta === null) ||
-    (fees.googleEnabled && d.adsGoogle === null)
-  );
+  return d.cogs === null || (s.metaEnabled && d.adsMeta === null) || (s.googleEnabled && d.adsGoogle === null);
 }
 
-export function computeDay(d: DayInput, fees: Fees): DayResult {
+export function computeDay(d: DayInput, s: FeeSettings): DayResult {
+  const fees = feesFor(s, d.date);
   const netRev = n(d.gross) - n(d.discounts) - n(d.reversals);
-  const adsMeta = fees.metaEnabled ? n(d.adsMeta) : 0;
-  const adsGoogle = fees.googleEnabled ? n(d.adsGoogle) : 0;
+  const adsMeta = s.metaEnabled ? n(d.adsMeta) : 0;
+  const adsGoogle = s.googleEnabled ? n(d.adsGoogle) : 0;
   const adSpend = adsMeta + adsGoogle;
-  const cashback = (adSpend * fees.cashbackPct) / 100;
+  const cashbackBase = fees.cashbackOn === "meta" ? adsMeta : fees.cashbackOn === "google" ? adsGoogle : adSpend;
+  const cashback = (cashbackBase * fees.cashbackPct) / 100;
   const metaAgency = (adsMeta * fees.metaAgencyPct) / 100;
   const googleAgency = (adsGoogle * fees.googleAgencyPct) / 100;
-  const totalCost = n(d.cogs) + adSpend + metaAgency + googleAgency + n(d.txFee) - cashback;
+  const txFee = d.txFee ?? (n(d.gross) * fees.txPct) / 100;
+  const totalCost = n(d.cogs) + adSpend + metaAgency + googleAgency + txFee - cashback;
   const profit = netRev - totalCost;
   return {
     netRev,
+    txFee,
     aov: d.orders ? netRev / d.orders : null,
     cogPct: d.cogs === null ? null : ratio(d.cogs * 100, netRev),
     adsMeta,
@@ -100,11 +119,10 @@ export type Totals = DayResult & {
   reversals: number;
   orders: number;
   cogs: number;
-  txFee: number;
   days: number;
 };
 
-export function sumDays(days: DayInput[], fees: Fees): Totals {
+export function sumDays(days: DayInput[], fees: FeeSettings): Totals {
   const t = {
     gross: 0, discounts: 0, reversals: 0, orders: 0, cogs: 0, txFee: 0, days: 0,
     netRev: 0, adsMeta: 0, adsGoogle: 0, adSpend: 0, cashback: 0, metaAgency: 0, googleAgency: 0, totalCost: 0, profit: 0,
@@ -118,7 +136,7 @@ export function sumDays(days: DayInput[], fees: Fees): Totals {
     t.reversals += n(d.reversals);
     t.orders += n(d.orders);
     t.cogs += n(d.cogs);
-    t.txFee += n(d.txFee);
+    t.txFee += r.txFee;
     t.netRev += r.netRev;
     t.adsMeta += r.adsMeta;
     t.adsGoogle += r.adsGoogle;
@@ -180,41 +198,54 @@ export function emptyDay(date: string): DayInput {
   };
 }
 
+const MOCK_MONTHS_BACK = 7; // dados de exemplo desde há 7 meses
+
 /** Gera um mês de exemplo, com dados até ao dia anterior a `today`. */
 export function mockMonth(year: number, month: number, today: string): DayInput[] {
   const total = daysInMonth(year, month);
+  const ty = Number(today.slice(0, 4));
+  const tm = Number(today.slice(5, 7)) - 1;
+  const monthsAgo = (ty - year) * 12 + (tm - month);
+  const scale = monthsAgo > MOCK_MONTHS_BACK ? 0 : 0.45 + 0.55 * (1 - monthsAgo / MOCK_MONTHS_BACK);
   const out: DayInput[] = [];
   for (let day = 1; day <= total; day++) {
     const date = isoDate(year, month, day);
-    if (date >= today) {
+    if (date >= today || scale === 0) {
       out.push(emptyDay(date));
       continue;
     }
     const rnd = seeded(year * 10000 + (month + 1) * 100 + day);
-    const gross = round2(450 + rnd() * 1600);
+    const wd = weekday(date);
+    const weekdayBoost = [0.9, 0.85, 0.95, 1.05, 1.15, 1.05, 0.95][wd];
+    const gross = round2((450 + rnd() * 1600) * scale * weekdayBoost);
     const orders = Math.max(1, Math.round(gross / (48 + rnd() * 14)));
     const discounts = round2(gross * (0.07 + rnd() * 0.05));
-    const reversals = rnd() < 0.15 ? round2(20 + rnd() * 80) : 0;
+    const reversals = rnd() < 0.15 ? round2(20 + rnd() * 80 * scale) : 0;
     const net = gross - discounts - reversals;
     const adsGoogle = round2(net * (0.25 + rnd() * 0.45));
-    const atc = round2(2.6 + rnd() * 2.4);
     const checkout = round2(1.3 + rnd() * 1.6);
+    const recent = monthsAgo === 0;
     out.push({
       date,
       gross,
       discounts,
       reversals,
       orders,
-      // alguns dias sem custo preenchido, para mostrar "incompleto"
-      cogs: day % 9 === 4 ? null : round2(net * (0.29 + rnd() * 0.1)),
+      // alguns dias recentes sem custo preenchido, para mostrar "incompleto"
+      cogs: recent && day % 9 === 4 ? null : round2(net * (0.29 + rnd() * 0.1)),
       adsMeta: 0,
       adsGoogle,
-      txFee: round2(gross * (0.025 + rnd() * 0.025)),
-      atc: round2(atc),
-      checkout: round2(checkout),
+      txFee: null, // calculada a partir da % do fornecedor de pagamentos
+      atc: round2(2.6 + rnd() * 2.4),
+      checkout,
       cvr: round2(checkout * (0.45 + rnd() * 0.25)),
       note: "",
     });
   }
   return out;
 }
+
+// ---------- acesso aos dados (demo: localStorage) ----------
+
+export const monthStorageKey = (y: number, m: number) => `fv.ps.${y}-${String(m + 1).padStart(2, "0")}`;
+export const FEES_KEY = "fv.ps.fees";

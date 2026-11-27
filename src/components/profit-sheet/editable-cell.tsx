@@ -26,12 +26,14 @@ type Props = {
   source?: Source;
   disabled?: boolean;
   label: string;
+  /** Valor calculado mostrado quando a célula está vazia (ex.: taxa de transação pela %). */
+  fallback?: number;
 };
 
 /** Célula com "€" que se pode editar. Grava ao sair do campo ou ao carregar Enter. */
-export function EditableCell({ value, onChange, source = "manual", disabled, label }: Props) {
+export function EditableCell({ value, onChange, source = "manual", disabled, label, fallback }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
-  const missing = value === null && !disabled;
+  const missing = value === null && !disabled && fallback === undefined;
   const src = sourceStyle[source];
 
   function commit() {
@@ -56,7 +58,7 @@ export function EditableCell({ value, onChange, source = "manual", disabled, lab
         inputMode="decimal"
         disabled={disabled}
         value={draft ?? fmtNum(value)}
-        placeholder={disabled ? "" : "—"}
+        placeholder={disabled ? "" : fallback !== undefined ? fmtNum(fallback) : "—"}
         onFocus={(e) => {
           setDraft(fmtNum(value));
           e.currentTarget.select();
@@ -74,6 +76,7 @@ export function EditableCell({ value, onChange, source = "manual", disabled, lab
           "w-20 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-right tabular-nums outline-none",
           "hover:border-border focus:border-primary focus:bg-background",
           missing && "border-amber-500/40 bg-amber-500/10 placeholder:text-amber-400",
+          !missing && value === null && "placeholder:text-muted-foreground",
           disabled && "text-muted-foreground/50",
         )}
       />

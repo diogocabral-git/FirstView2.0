@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/env";
 
-const PUBLIC_PATHS = ["/login", "/api/cron", "/api/integrations"];
+const PUBLIC_PATHS = ["/login", "/partilha", "/api/cron", "/api/integrations"];
 
 // Renova a sessão do Supabase e envia para /login quem não tiver sessão.
 // Sem variáveis do Supabase definidas, a app corre em modo demo e não exige login.

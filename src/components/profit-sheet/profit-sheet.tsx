@@ -1,12 +1,16 @@
 "use client";
 
-import { Fragment, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, StickyNote } from "lucide-react";
+import { Fragment, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Share2, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  computeDay, daysInMonth, defaultFees, isIncomplete, isTracked, mockMonth, sumDays, weekday,
-  type DayInput, type DayResult, type Fees, type Totals,
+  computeDay, daysInMonth, defaultFeeSettings, feesFor, FEES_KEY, isIncomplete, isTracked, mockMonth, monthStorageKey, sumDays, weekday,
+  type DayInput, type DayResult, type FeeSettings, type Totals,
 } from "@/lib/profit-sheet";
+import { useMounted, useStore } from "@/lib/store";
+import { todayInLisbon } from "@/lib/dates";
+import { FeesDialog } from "./fees-dialog";
+import { encodeShare, type SharePayload } from "./share";
 import { EditableCell, type Source } from "./editable-cell";
 import { ProfitSummary } from "./summary";
 import { fmtMoney, fmtPct, fmtX } from "./format";
@@ -60,7 +64,7 @@ const columns: Column[] = [
 
   { key: "metaAgency", group: "fees", label: "Agência Meta", hint: "% sobre o gasto Meta", cell: (_, r) => fmtMoney(r.metaAgency), total: (t) => fmtMoney(t.metaAgency) },
   { key: "googleAgency", group: "fees", label: "Agência Google", hint: "% sobre o gasto Google", cell: (_, r) => fmtMoney(r.googleAgency), total: (t) => fmtMoney(t.googleAgency) },
-  { key: "txFee", group: "fees", label: "Taxas pag.", input: { field: "txFee", source: "shopify" }, total: (t) => fmtMoney(t.txFee) },
+  { key: "txFee", group: "fees", label: "Taxas transação", hint: "% do fornecedor de pagamentos sobre a receita bruta (pode ser corrigida à mão)", input: { field: "txFee", source: "shopify" }, total: (t) => fmtMoney(t.txFee) },
 
   { key: "totalCost", group: "result", label: "Custo total", hint: "COGS + anúncios + agências + taxas − cashback", cell: (_, r) => fmtMoney(r.totalCost), total: (t) => fmtMoney(t.totalCost) },
   { key: "profit", group: "result", label: "Lucro", cell: (_, r) => fmtMoney(r.profit), total: (t) => fmtMoney(t.profit), tone: profitTone },
@@ -82,48 +86,30 @@ const dayLabel = { format: (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMont
 const weekdayLabel = { format: (d: Date) => WEEKDAYS[d.getUTCDay()] };
 const asDate = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
-function todayInLisbon() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Lisbon" }).format(new Date());
-}
-
-const storageKey = (y: number, m: number) => `fv.profitSheet.${y}-${m + 1}`;
-
-function loadMonth(y: number, m: number, today: string): DayInput[] {
-  const raw = localStorage.getItem(storageKey(y, m));
-  if (raw) {
-    try {
-      return JSON.parse(raw) as DayInput[];
-    } catch {}
-  }
-  return mockMonth(y, m, today);
-}
-
-function loadFees(): Fees {
-  try {
-    return { ...defaultFees, ...JSON.parse(localStorage.getItem("fv.profitSheet.fees") ?? "{}") };
-  } catch {
-    return defaultFees;
-  }
-}
-
-const subscribeNoop = () => () => {};
+const feesFallback = () => defaultFeeSettings;
+const pctNum = (v: number) => v.toLocaleString("pt-PT", { maximumFractionDigits: 2 });
 
 // ---------- componente ----------
 
 /** Só desenha no browser: a folha depende da data de hoje e dos valores guardados localmente. */
-export function ProfitSheet() {
-  const mounted = useSyncExternalStore(subscribeNoop, () => true, () => false);
+export function ProfitSheet({ shared }: { shared?: SharePayload }) {
+  const mounted = useMounted();
   if (!mounted) return <div className="h-96 animate-pulse rounded-xl border border-border bg-card" />;
-  return <ProfitSheetInner />;
+  return <ProfitSheetInner shared={shared} />;
 }
 
 type Filter = "all" | "incomplete" | "loss";
 
-function ProfitSheetInner() {
-  const today = todayInLisbon();
-  const [ym, setYm] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 }));
-  const [days, setDays] = useState<DayInput[]>(() => loadMonth(ym.y, ym.m, today));
-  const [fees, setFeesState] = useState<Fees>(loadFees);
+function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
+  const readOnly = !!shared;
+  const [today] = useState(todayInLisbon);
+  const [ym, setYm] = useState(() => (shared ? { y: shared.y, m: shared.m } : { y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 }));
+  const monthFallback = useMemo(() => () => mockMonth(ym.y, ym.m, today), [ym, today]);
+  const [storedDays, setDays] = useStore<DayInput[]>(monthStorageKey(ym.y, ym.m), monthFallback);
+  const [storedFees, setFeesState] = useStore<FeeSettings>(FEES_KEY, feesFallback);
+  const days = shared ? shared.days : storedDays;
+  const fees = shared ? shared.fees : storedFees;
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [collapsed, setCollapsed] = useState<Set<GroupKey>>(new Set());
   const [showFees, setShowFees] = useState(false);
@@ -136,32 +122,32 @@ function ProfitSheetInner() {
     const d = new Date(Date.UTC(ym.y, ym.m + delta, 1));
     const next = { y: d.getUTCFullYear(), m: d.getUTCMonth() };
     setYm(next);
-    setDays(loadMonth(next.y, next.m, today));
     setFilter("all");
   }
 
   function updateDay(date: string, patch: Partial<DayInput>) {
-    setDays((prev) => {
-      const next = prev.map((d) => (d.date === date ? { ...d, ...patch } : d));
-      localStorage.setItem(storageKey(ym.y, ym.m), JSON.stringify(next));
-      return next;
-    });
+    setDays((prev) => prev.map((d) => (d.date === date ? { ...d, ...patch } : d)));
   }
 
-  function setFees(patch: Partial<Fees>) {
-    setFeesState((prev) => {
-      const next = { ...prev, ...patch };
-      localStorage.setItem("fv.profitSheet.fees", JSON.stringify(next));
-      return next;
-    });
+  function setFees(patch: Partial<FeeSettings>) {
+    setFeesState((prev) => ({ ...prev, ...patch }));
+  }
+
+  function share() {
+    const url = `${location.origin}/partilha/profit-sheet#${encodeShare({ y: ym.y, m: ym.m, days, fees })}`;
+    setShareUrl(url);
+    navigator.clipboard?.writeText(url).catch(() => {});
   }
 
   const tracked = days.filter(isTracked);
+  const currentFees = feesFor(fees, days.findLast((d) => isTracked(d))?.date ?? today);
   const totals = useMemo(() => sumDays(days, fees), [days, fees]);
   const previous = useMemo(() => {
     const d = new Date(Date.UTC(ym.y, ym.m - 1, 1));
-    const prev = mockMonth(d.getUTCFullYear(), d.getUTCMonth(), today).slice(0, Math.max(totals.days, 1));
-    return sumDays(prev, fees);
+    const key = monthStorageKey(d.getUTCFullYear(), d.getUTCMonth());
+    const raw = localStorage.getItem(key);
+    const all: DayInput[] = raw ? JSON.parse(raw) : mockMonth(d.getUTCFullYear(), d.getUTCMonth(), today);
+    return sumDays(all.slice(0, Math.max(totals.days, 1)), fees);
   }, [ym, today, totals.days, fees]);
 
   const breakEven = useMemo(() => {
@@ -212,7 +198,6 @@ function ProfitSheetInner() {
       const y = Number(today.slice(0, 4));
       const m = Number(today.slice(5, 7)) - 1;
       setYm({ y, m });
-      setDays(loadMonth(y, m, today));
     }
     setFilter("all");
     requestAnimationFrame(() =>
@@ -224,8 +209,8 @@ function ProfitSheetInner() {
     <div className="space-y-6">
       {/* Cabeçalho */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Profit Sheet</h1>
-        <div className="flex items-center rounded-lg border border-border bg-card">
+        <h1 className="text-2xl font-semibold">Profit Sheet{readOnly && <span className="ml-2 text-base font-normal text-muted-foreground">· só leitura</span>}</h1>
+        <div className={cn("flex items-center rounded-lg border border-border bg-card", readOnly && "pointer-events-none [&>button]:invisible")}>
           <button aria-label="Mês anterior" onClick={() => goMonth(-1)} className="p-2 text-muted-foreground hover:text-foreground">
             <ChevronLeft className="size-4" />
           </button>
@@ -279,19 +264,30 @@ function ProfitSheetInner() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <span className="text-muted-foreground">Agência Meta: <b className="text-foreground">{fees.metaAgencyPct}%</b></span>
-            <span className="text-muted-foreground">Agência Google: <b className="text-foreground">{fees.googleAgencyPct}%</b></span>
-            <span className="text-muted-foreground">Cashback cartão: <b className="text-emerald-400">+{fees.cashbackPct}%</b></span>
+            <span className="text-muted-foreground">Agência Meta: <b className="text-foreground">{pctNum(currentFees.metaAgencyPct)}%</b></span>
+            <span className="text-muted-foreground">Agência Google: <b className="text-foreground">{pctNum(currentFees.googleAgencyPct)}%</b></span>
+            <span className="text-muted-foreground">Taxas de transação: <b className="text-foreground">{pctNum(currentFees.txPct)}%</b></span>
+            <span className="text-muted-foreground">
+              Cashback cartão: <b className="text-emerald-400">+{pctNum(currentFees.cashbackPct)}%</b>{" "}
+              {currentFees.cashbackOn === "both" ? "Meta + Google" : currentFees.cashbackOn === "meta" ? "só Meta" : "só Google"}
+            </span>
             <span className="flex items-center gap-2 text-muted-foreground">
               Canais:
-              <Toggle label="Meta" checked={fees.metaEnabled} onChange={(v) => setFees({ metaEnabled: v })} />
-              <Toggle label="Google" checked={fees.googleEnabled} onChange={(v) => setFees({ googleEnabled: v })} />
+              <Toggle label="Meta" checked={fees.metaEnabled} disabled={readOnly} onChange={(v) => setFees({ metaEnabled: v })} />
+              <Toggle label="Google" checked={fees.googleEnabled} disabled={readOnly} onChange={(v) => setFees({ googleEnabled: v })} />
             </span>
-            <button onClick={() => setShowFees((v) => !v)} className="rounded-lg border border-border bg-card px-3 py-1.5 font-medium hover:bg-muted">
-              Alterar taxas
-            </button>
+            {!readOnly && (
+              <button onClick={() => setShowFees((v) => !v)} className="rounded-lg border border-border bg-card px-3 py-1.5 font-medium hover:bg-muted">
+                Alterar taxas
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-1">
+            {!readOnly && (
+              <button onClick={share} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 font-medium hover:bg-muted">
+                <Share2 className="size-4" /> Partilhar
+              </button>
+            )}
             <button onClick={goToday} className="rounded-lg border border-border bg-card px-3 py-1.5 font-medium hover:bg-muted">Hoje</button>
             <button aria-label="Ver colunas à esquerda" onClick={() => scrollTable(-1)} className="rounded-lg p-2 text-primary hover:bg-muted"><ArrowLeft className="size-4" /></button>
             <button aria-label="Ver colunas à direita" onClick={() => scrollTable(1)} className="rounded-lg p-2 text-primary hover:bg-muted"><ArrowRight className="size-4" /></button>
@@ -299,11 +295,24 @@ function ProfitSheetInner() {
         </div>
 
         {showFees && (
-          <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4 text-sm">
-            <FeeInput label="Agência Meta (%)" value={fees.metaAgencyPct} onChange={(v) => setFees({ metaAgencyPct: v })} />
-            <FeeInput label="Agência Google (%)" value={fees.googleAgencyPct} onChange={(v) => setFees({ googleAgencyPct: v })} />
-            <FeeInput label="Cashback cartão (%)" value={fees.cashbackPct} onChange={(v) => setFees({ cashbackPct: v })} />
-            <button onClick={() => setShowFees(false)} className="rounded-lg bg-primary px-3 py-2 font-medium text-primary-foreground">Feito</button>
+          <FeesDialog
+            settings={fees}
+            currentFrom={currentFees.from}
+            current={currentFees}
+            today={today}
+            onApply={(next) => {
+              setFeesState(next);
+              setShowFees(false);
+            }}
+            onCancel={() => setShowFees(false)}
+          />
+        )}
+
+        {shareUrl && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4 text-sm">
+            <span className="text-muted-foreground">Link copiado. Quem o abrir vê esta Profit Sheet só para leitura:</span>
+            <input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2" />
+            <button onClick={() => setShareUrl(null)} className="text-muted-foreground hover:text-foreground">Fechar</button>
           </div>
         )}
       </section>
@@ -403,10 +412,13 @@ function ProfitSheetInner() {
                                 tracked && c.tone && toneClass(c.tone(r, breakEven)),
                               )}
                             >
-                              {c.input ? (
+                              {c.input && readOnly ? (
+                                tracked ? fmtMoney(c.input.field === "txFee" ? r.txFee : d[c.input.field]) : <span className="text-muted-foreground/40">—</span>
+                              ) : c.input ? (
                                 <EditableCell
                                   label={`${c.label} ${d.date}`}
                                   value={d[c.input.field]}
+                                  fallback={c.input.field === "txFee" && tracked ? r.txFee : undefined}
                                   source={c.input.source}
                                   disabled={(c.input.field === "adsMeta" && !fees.metaEnabled) || (c.input.field === "adsGoogle" && !fees.googleEnabled)}
                                   onChange={(v) => updateDay(d.date, { [c.input!.field]: v })}
@@ -423,6 +435,8 @@ function ProfitSheetInner() {
                     <td className="border-b border-border px-4 py-1.5 text-center">
                       <button
                         aria-label="Nota"
+                        title={d.note || undefined}
+                        disabled={readOnly && !d.note}
                         onClick={() => setOpenNote(openNote === d.date ? null : d.date)}
                         className={cn("rounded p-1 hover:bg-muted", d.note ? "text-primary" : "text-muted-foreground")}
                       >
@@ -435,9 +449,10 @@ function ProfitSheetInner() {
                       <td colSpan={visibleColumns.length + groups.length + 2} className="border-b border-border bg-background px-4 py-3">
                         <textarea
                           autoFocus
+                          readOnly={readOnly}
                           defaultValue={d.note}
                           placeholder="Nota para este dia…"
-                          onBlur={(e) => updateDay(d.date, { note: e.target.value })}
+                          onBlur={(e) => !readOnly && updateDay(d.date, { note: e.target.value })}
                           className="sticky left-4 h-20 w-full max-w-xl rounded-lg border border-border bg-card p-2 text-sm outline-none focus:border-primary"
                         />
                       </td>
@@ -468,16 +483,17 @@ function ProfitSheetInner() {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className={cn("text-xs text-muted-foreground", readOnly && "hidden")}>
         Dados de exemplo. As alterações ficam guardadas só neste browser até a base de dados estar ligada.
       </p>
     </div>
   );
 }
 
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
+      disabled={disabled}
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
@@ -488,21 +504,5 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
         <span className={cn("absolute top-0.5 size-4 rounded-full bg-white transition-all", checked ? "left-4.5" : "left-0.5")} />
       </span>
     </button>
-  );
-}
-
-function FeeInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-muted-foreground">{label}</span>
-      <input
-        type="number"
-        min={0}
-        step={0.5}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
-        className="w-32 rounded-lg border border-border bg-background px-3 py-2 tabular-nums outline-none focus:border-primary"
-      />
-    </label>
   );
 }
