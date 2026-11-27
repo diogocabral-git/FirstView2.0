@@ -4,7 +4,7 @@ Plataforma web para acompanhar os dados do negócio de e-commerce num só sítio
 
 ![Dashboard](docs/dashboard.png)
 
-> Estado atual: as páginas abaixo já funcionam com **dados de exemplo**, guardados no browser (`src/lib/store.ts`) até o Supabase estar ligado. As restantes secções estão marcadas como "em construção".
+> Estado atual: as páginas abaixo já funcionam e começam a zero. O que se preenche fica guardado no browser (`src/lib/store.ts`) até o Supabase estar ligado. As restantes secções estão marcadas como "em construção".
 
 ## Páginas
 
