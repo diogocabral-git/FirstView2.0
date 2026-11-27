@@ -15,6 +15,9 @@ Plataforma web para acompanhar os dados do negócio de e-commerce num só sítio
 | Profit Sheet | Tabela diária editável, subtotais semanais, taxas com data de início ou correção de todo o histórico (agências, transação, cashback Meta/Google), filtros e link de partilha só de leitura |
 | Despesas | Despesas por categoria (operacional, equipa, pessoal, extra), subscrições mensais/anuais e evolução mensal |
 | Daily Reports | Report diário em 2 passos (métricas e o teu dia) com comparação com ontem e imagem para copiar para o WhatsApp |
+| Reembolsos / Chargebacks / Disputas | Registo com motivo, estado, prazos (com aviso a 3 dias), taxa sobre a receita bruta, taxa de vitória e repartição por motivo |
+| Concorrentes | Lojas a seguir, link direto para os anúncios na Meta Ad Library e para os mais vendidos, produtos a seguir com preço, "visto hoje" |
+| Product Feed | Produtos para Google Merchant Center e Meta: importação do CSV da Shopify, validação dos campos obrigatórios e exportação CSV por canal |
 | Week / Monthly Reports | Resumo por semana ou mês: receita, custos, ROAS, lucro, reembolsos, despesas, lucro final e reports enviados |
 
 ## Tecnologias
