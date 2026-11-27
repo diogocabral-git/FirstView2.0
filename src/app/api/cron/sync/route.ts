@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { integrations, type IntegrationConnection } from "@/lib/integrations";
 import { createServiceClient } from "@/lib/supabase/server";
 
-// Chamado de hora a hora pelo Vercel Cron (ver vercel.json).
+// Chamado pelo Vercel Cron (ver vercel.json). No plano Hobby só pode correr 1x por dia;
+// no plano Pro pode passar a "0 * * * *" (de hora a hora).
 // Para cada ligação ativa, sincroniza os últimos 3 dias (para apanhar correções e reembolsos).
 export async function GET(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {

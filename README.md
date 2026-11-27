@@ -58,7 +58,7 @@ vercel.json                agenda do cron
 ## Como funcionam os dados
 
 1. Cada loja liga as suas contas em **Integrações** (OAuth). Os tokens ficam na tabela `integrations`, acessível apenas pelo servidor.
-2. De hora a hora, `/api/cron/sync` percorre as ligações ativas e chama o `sync()` de cada integração, que grava encomendas, reembolsos, gastos em anúncios, etc. no Supabase.
+2. Periodicamente (1x por dia no plano gratuito da Vercel, de hora a hora no Pro), `/api/cron/sync` percorre as ligações ativas e chama o `sync()` de cada integração, que grava encomendas, reembolsos, gastos em anúncios, etc. no Supabase.
 3. O dashboard lê do Supabase (por ex. a vista `daily_profit`), por isso carrega rápido e guarda histórico.
 
 ## Base de dados
