@@ -187,7 +187,7 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
   const visibleDays = filter === "incomplete" ? incomplete : filter === "loss" ? inLoss : days;
   const visibleColumns = columns.filter((c) => !collapsed.has(c.group));
 
-  // linhas: dias + médias da semana (seg–dom) após cada domingo e no fim do mês (só na vista "todos")
+  // linhas: dias + linha da semana (seg–dom: somas e médias) após cada domingo e no fim do mês (só na vista "todos")
   const rows: ({ kind: "day"; day: DayInput } | { kind: "week"; label: string; avg: Averages })[] = [];
   let weekBucket: DayInput[] = [];
   visibleDays.forEach((day, i) => {
@@ -200,7 +200,7 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
       const b = asDate(day.date);
       const range =
         weekBucket.length === 1 ? dayLabel.format(b) : a.getUTCMonth() === b.getUTCMonth() ? `${a.getUTCDate()}–${dayLabel.format(b)}` : `${dayLabel.format(a)}–${dayLabel.format(b)}`;
-      rows.push({ kind: "week", label: `Média ${range}`, avg: averageDays(weekBucket, fees) });
+      rows.push({ kind: "week", label: `Semana ${range}`, avg: averageDays(weekBucket, fees) });
     }
     if (sunday) weekBucket = [];
   });

@@ -200,20 +200,24 @@ export const FEES_KEY = "fv.v2.ps.fees";
 
 export type Averages = Totals & { atc: number | null; checkout: number | null; cvr: number | null };
 
-/** Médias diárias dos dias com dados: valores em € por dia; rácios (AOV, ROAS, margem…) ponderados. */
+/**
+ * Linha da semana: valores em € somados; AOV, COGS %, ATC, checkout e CVR em média dos dias com dados;
+ * ROAS e margem calculados a partir das somas.
+ */
 export function averageDays(days: DayInput[], fees: FeeSettings): Averages {
   const t = sumDays(days, fees);
-  const k = t.days || 1;
-  const avgOf = (key: "atc" | "checkout" | "cvr") => {
-    const vals = days.filter(isTracked).map((d) => d[key]).filter((v): v is number => v !== null);
-    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+  const tracked = days.filter(isTracked);
+  const mean = (vals: (number | null)[]) => {
+    const v = vals.filter((x): x is number => x !== null && Number.isFinite(x));
+    return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
   };
+  const results = tracked.map((d) => computeDay(d, fees));
   return {
     ...t,
-    gross: t.gross / k, discounts: t.discounts / k, reversals: t.reversals / k, orders: t.orders / k,
-    cogs: t.cogs / k, txFee: t.txFee / k, netRev: t.netRev / k, adsMeta: t.adsMeta / k, adsGoogle: t.adsGoogle / k,
-    adSpend: t.adSpend / k, cashback: t.cashback / k, metaAgency: t.metaAgency / k, googleAgency: t.googleAgency / k,
-    totalCost: t.totalCost / k, profit: t.profit / k,
-    atc: avgOf("atc"), checkout: avgOf("checkout"), cvr: avgOf("cvr"),
+    aov: mean(results.map((r) => r.aov)),
+    cogPct: mean(results.map((r) => (r.netRev > 0 ? r.cogPct : null))),
+    atc: mean(tracked.map((d) => d.atc)),
+    checkout: mean(tracked.map((d) => d.checkout)),
+    cvr: mean(tracked.map((d) => d.cvr)),
   };
 }
