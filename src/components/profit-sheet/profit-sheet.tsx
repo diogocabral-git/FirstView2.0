@@ -4,8 +4,8 @@ import { Fragment, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Share2, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  computeDay, daysInMonth, defaultFeeSettings, feesFor, FEES_KEY, isIncomplete, isTracked, blankMonth, monthStorageKey, sumDays, weekday,
-  type DayInput, type DayResult, type FeeSettings, type Totals,
+  computeDay, daysInMonth, defaultFeeSettings, feesFor, FEES_KEY, isIncomplete, isTracked, blankMonth, monthStorageKey, sumDays, averageDays, weekday,
+  type Averages, type DayInput, type DayResult, type FeeSettings, type Totals,
 } from "@/lib/profit-sheet";
 import { useMounted, useStore } from "@/lib/store";
 import { todayInLisbon } from "@/lib/dates";
@@ -29,6 +29,7 @@ type Column = {
   input?: { field: InputKey; source: Source };
   cell?: (d: DayInput, r: DayResult) => string;
   total?: (t: Totals) => string;
+  avg?: (a: Averages) => string;
   tone?: (r: { profit: number; roas: number | null }, breakEven: number | null) => Tone;
 };
 
@@ -70,9 +71,9 @@ const columns: Column[] = [
   { key: "profit", group: "result", label: "Lucro", cell: (_, r) => fmtMoney(r.profit), total: (t) => fmtMoney(t.profit), tone: profitTone },
   { key: "margin", group: "result", label: "Margem", cell: (_, r) => fmtPct(r.margin), total: (t) => fmtPct(t.margin), tone: profitTone },
 
-  { key: "atc", group: "metrics", label: "ATC", hint: "Add to cart rate", cell: (d) => fmtPct(d.atc) },
-  { key: "checkout", group: "metrics", label: "Checkout", hint: "Checkout rate", cell: (d) => fmtPct(d.checkout) },
-  { key: "cvr", group: "metrics", label: "CVR", hint: "Taxa de conversão", cell: (d) => fmtPct(d.cvr) },
+  { key: "atc", group: "metrics", label: "ATC", hint: "Add to cart rate", cell: (d) => fmtPct(d.atc), avg: (a) => fmtPct(a.atc) },
+  { key: "checkout", group: "metrics", label: "Checkout", hint: "Checkout rate", cell: (d) => fmtPct(d.checkout), avg: (a) => fmtPct(a.checkout) },
+  { key: "cvr", group: "metrics", label: "CVR", hint: "Taxa de conversão", cell: (d) => fmtPct(d.cvr), avg: (a) => fmtPct(a.cvr) },
 ];
 
 const toneClass = (t: Tone) => (t === "pos" ? "bg-emerald-500/10 text-emerald-400" : t === "neg" ? "bg-red-500/10 text-red-400" : "");
@@ -165,18 +166,22 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
   const visibleDays = filter === "incomplete" ? incomplete : filter === "loss" ? inLoss : days;
   const visibleColumns = columns.filter((c) => !collapsed.has(c.group));
 
-  // linhas: dias + subtotal semanal após cada domingo e no fim do mês (só na vista "todos")
-  const rows: ({ kind: "day"; day: DayInput } | { kind: "week"; label: string; totals: Totals })[] = [];
+  // linhas: dias + médias da semana (seg–dom) após cada domingo e no fim do mês (só na vista "todos")
+  const rows: ({ kind: "day"; day: DayInput } | { kind: "week"; label: string; avg: Averages })[] = [];
   let weekBucket: DayInput[] = [];
   visibleDays.forEach((day, i) => {
     rows.push({ kind: "day", day });
     if (filter !== "all") return;
     weekBucket.push(day);
-    const last = i === visibleDays.length - 1;
-    if ((weekday(day.date) === 0 || last) && weekBucket.some(isTracked)) {
-      rows.push({ kind: "week", label: `Sem. até ${dayLabel.format(asDate(day.date))}`, totals: sumDays(weekBucket, fees) });
+    const sunday = weekday(day.date) === 0;
+    if ((sunday || i === visibleDays.length - 1) && weekBucket[0].date <= today) {
+      const a = asDate(weekBucket[0].date);
+      const b = asDate(day.date);
+      const range =
+        weekBucket.length === 1 ? dayLabel.format(b) : a.getUTCMonth() === b.getUTCMonth() ? `${a.getUTCDate()}–${dayLabel.format(b)}` : `${dayLabel.format(a)}–${dayLabel.format(b)}`;
+      rows.push({ kind: "week", label: `Média ${range}`, avg: averageDays(weekBucket, fees) });
     }
-    if (weekday(day.date) === 0) weekBucket = [];
+    if (sunday) weekBucket = [];
   });
 
   function toggleGroup(g: GroupKey) {
@@ -367,8 +372,13 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
             {rows.map((row) => {
               if (row.kind === "week") {
                 return (
-                  <tr key={`wk-${row.label}`} className="bg-background font-semibold">
-                    <td className="sticky left-0 z-10 whitespace-nowrap border-b border-border bg-background px-4 py-2.5">{row.label}</td>
+                  <tr key={`wk-${row.label}`} className="bg-primary/10 font-semibold">
+                    <td className="sticky left-0 z-10 whitespace-nowrap border-b border-border bg-[#1a1f33] px-4 py-2.5">
+                      {row.label}
+                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                        {row.avg.days ? `(${row.avg.days} ${row.avg.days === 1 ? "dia" : "dias"})` : "(sem dados)"}
+                      </span>
+                    </td>
                     {groups.map((g) =>
                       collapsed.has(g.key) ? (
                         <td key={g.key} className="border-b border-border" />
@@ -376,8 +386,8 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
                         visibleColumns
                           .filter((c) => c.group === g.key)
                           .map((c) => (
-                            <td key={c.key} className={cn("whitespace-nowrap border-b border-border px-4 py-2.5 text-right tabular-nums", c.tone && toneClass(c.tone(row.totals, breakEven)))}>
-                              {c.total?.(row.totals) ?? ""}
+                            <td key={c.key} className={cn("whitespace-nowrap border-b border-border px-4 py-2.5 text-right tabular-nums", row.avg.days > 0 && c.tone && toneClass(c.tone(row.avg, breakEven)))}>
+                              {row.avg.days ? (c.avg?.(row.avg) ?? c.total?.(row.avg) ?? "") : "—"}
                             </td>
                           ))
                       ),

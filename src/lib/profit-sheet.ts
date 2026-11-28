@@ -197,3 +197,23 @@ export function blankMonth(year: number, month: number): DayInput[] {
 
 export const monthStorageKey = (y: number, m: number) => `fv.v2.ps.${y}-${String(m + 1).padStart(2, "0")}`;
 export const FEES_KEY = "fv.v2.ps.fees";
+
+export type Averages = Totals & { atc: number | null; checkout: number | null; cvr: number | null };
+
+/** Médias diárias dos dias com dados: valores em € por dia; rácios (AOV, ROAS, margem…) ponderados. */
+export function averageDays(days: DayInput[], fees: FeeSettings): Averages {
+  const t = sumDays(days, fees);
+  const k = t.days || 1;
+  const avgOf = (key: "atc" | "checkout" | "cvr") => {
+    const vals = days.filter(isTracked).map((d) => d[key]).filter((v): v is number => v !== null);
+    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+  };
+  return {
+    ...t,
+    gross: t.gross / k, discounts: t.discounts / k, reversals: t.reversals / k, orders: t.orders / k,
+    cogs: t.cogs / k, txFee: t.txFee / k, netRev: t.netRev / k, adsMeta: t.adsMeta / k, adsGoogle: t.adsGoogle / k,
+    adSpend: t.adSpend / k, cashback: t.cashback / k, metaAgency: t.metaAgency / k, googleAgency: t.googleAgency / k,
+    totalCost: t.totalCost / k, profit: t.profit / k,
+    atc: avgOf("atc"), checkout: avgOf("checkout"), cvr: avgOf("cvr"),
+  };
+}
