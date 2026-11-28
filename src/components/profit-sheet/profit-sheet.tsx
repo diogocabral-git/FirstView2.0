@@ -7,10 +7,10 @@ import {
   computeDay, daysInMonth, defaultFeeSettings, feesFor, FEES_KEY, isIncomplete, isTracked, blankMonth, monthStorageKey, sumDays, averageDays, weekday,
   type Averages, type DayInput, type DayResult, type FeeSettings, type Totals,
 } from "@/lib/profit-sheet";
-import { useMounted, useStore } from "@/lib/store";
+import { useMounted, useStore, writeStore } from "@/lib/store";
 import { todayInLisbon } from "@/lib/dates";
 import { FeesDialog } from "./fees-dialog";
-import { encodeShare, type SharePayload } from "./share";
+import { decodeShare, encodeShare, type SharePayload } from "./share";
 import { EditableCell, type Source } from "./editable-cell";
 import { ProfitSummary } from "./summary";
 import { fmtMoney, fmtPct, fmtX } from "./format";
@@ -90,6 +90,25 @@ const asDate = (iso: string) => new Date(`${iso}T12:00:00Z`);
 const feesFallback = () => defaultFeeSettings;
 const pctNum = (v: number) => v.toLocaleString("pt-PT", { maximumFractionDigits: 2 });
 
+// ---------- importação por link (#importar=…) ----------
+
+type ImportPayload = { y: number; m: number; days: (Partial<DayInput> & { date: string })[] };
+let lastImport: { y: number; m: number } | null = null;
+
+/** Lê um link "#importar=…", grava o mês no browser e limpa o URL. Devolve o mês importado. */
+function consumeImport(): { y: number; m: number } | null {
+  if (typeof window === "undefined") return lastImport;
+  const h = window.location.hash;
+  if (!h.startsWith("#importar=")) return lastImport;
+  const p = decodeShare(h.slice("#importar=".length)) as unknown as ImportPayload | null;
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+  if (!p || typeof p.y !== "number" || typeof p.m !== "number" || !Array.isArray(p.days)) return lastImport;
+  const byDate = new Map(p.days.map((d) => [d.date, d]));
+  writeStore(monthStorageKey(p.y, p.m), blankMonth(p.y, p.m).map((d) => ({ ...d, ...byDate.get(d.date) })));
+  lastImport = { y: p.y, m: p.m };
+  return lastImport;
+}
+
 // ---------- componente ----------
 
 /** Só desenha no browser: a folha depende da data de hoje e dos valores guardados localmente. */
@@ -104,7 +123,9 @@ type Filter = "all" | "incomplete" | "loss";
 function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
   const readOnly = !!shared;
   const [today] = useState(todayInLisbon);
-  const [ym, setYm] = useState(() => (shared ? { y: shared.y, m: shared.m } : { y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 }));
+  const [ym, setYm] = useState(() =>
+    shared ? { y: shared.y, m: shared.m } : (consumeImport() ?? { y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 }),
+  );
   const monthFallback = useMemo(() => () => blankMonth(ym.y, ym.m), [ym]);
   const [storedDays, setDays] = useStore<DayInput[]>(monthStorageKey(ym.y, ym.m), monthFallback);
   const [storedFees, setFeesState] = useStore<FeeSettings>(FEES_KEY, feesFallback);

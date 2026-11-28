@@ -4,7 +4,7 @@ const num1 = new Intl.NumberFormat("pt-PT", { minimumFractionDigits: 1, maximumF
 
 export const fmtMoney = (v: number | null | undefined) => (v === null || v === undefined ? "—" : money.format(v));
 export const fmtNum = (v: number | null | undefined) => (v === null || v === undefined ? "" : num2.format(v));
-export const fmtPct = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${num1.format(v)}%`);
+export const fmtPct = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${num1.format(v || 0)}%`);
 export const fmtX = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${num2.format(v)}×`);
 
 export function fmtDelta(v: number | null, unit: "%" | "pp" = "%") {
