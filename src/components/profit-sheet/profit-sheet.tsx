@@ -88,6 +88,13 @@ const weekdayLabel = { format: (d: Date) => WEEKDAYS[d.getUTCDay()] };
 const asDate = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
 const feesFallback = () => defaultFeeSettings;
+
+/** Valores a zero aparecem a cinzento, para os números reais sobressaírem. */
+const isZeroText = (s: string) => /^-?0(,0+)?\s?[€%×]?$/.test(s.replace(/\u00a0/g, " ").trim());
+function Val({ text }: { text: string | undefined }) {
+  if (!text) return null;
+  return isZeroText(text) ? <span className="font-normal text-muted-foreground">{text}</span> : <>{text}</>;
+}
 const pctNum = (v: number) => v.toLocaleString("pt-PT", { maximumFractionDigits: 2 });
 
 // ---------- importação por link (#importar=…) ----------
@@ -408,7 +415,7 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
                           .filter((c) => c.group === g.key)
                           .map((c) => (
                             <td key={c.key} className={cn("whitespace-nowrap border-b border-border px-4 py-2.5 text-right tabular-nums", row.avg.days > 0 && c.tone && toneClass(c.tone(row.avg, breakEven)))}>
-                              {row.avg.days ? (c.avg?.(row.avg) ?? c.total?.(row.avg) ?? "") : "—"}
+                              {row.avg.days ? <Val text={c.avg?.(row.avg) ?? c.total?.(row.avg)} /> : "—"}
                             </td>
                           ))
                       ),
@@ -444,7 +451,7 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
                               )}
                             >
                               {c.input && readOnly ? (
-                                tracked ? fmtMoney(c.input.field === "txFee" ? r.txFee : d[c.input.field]) : <span className="text-muted-foreground/40">—</span>
+                                tracked ? <Val text={fmtMoney(c.input.field === "txFee" ? r.txFee : d[c.input.field])} /> : <span className="text-muted-foreground/40">—</span>
                               ) : c.input ? (
                                 <EditableCell
                                   label={`${c.label} ${d.date}`}
@@ -456,7 +463,7 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
                                   onChange={(v) => updateDay(d.date, { [c.input!.field]: v })}
                                 />
                               ) : tracked ? (
-                                c.cell?.(d, r)
+                                <Val text={c.cell?.(d, r)} />
                               ) : (
                                 <span className="text-muted-foreground/40">—</span>
                               )}
@@ -504,7 +511,7 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
                       .filter((c) => c.group === g.key)
                       .map((c) => (
                         <td key={c.key} className={cn("whitespace-nowrap px-4 py-3 text-right tabular-nums", c.tone && toneClass(c.tone(totals, breakEven)))}>
-                          {c.total?.(totals) ?? ""}
+                          <Val text={c.total?.(totals)} />
                         </td>
                       ))
                   ),

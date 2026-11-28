@@ -80,6 +80,7 @@ export function EditableCell({ value, onChange, source = "manual", disabled, lab
           missing && "border-amber-500/40 bg-amber-500/10 placeholder:text-amber-400",
           !missing && value === null && "placeholder:text-muted-foreground",
           disabled && "text-muted-foreground/50",
+          !disabled && value === 0 && draft === null && "text-muted-foreground",
         )}
       />
       <span className="text-xs text-muted-foreground">€</span>
