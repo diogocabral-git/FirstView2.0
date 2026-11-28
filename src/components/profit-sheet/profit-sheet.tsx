@@ -400,10 +400,10 @@ function ProfitSheetInner({ shared }: { shared?: SharePayload }) {
             {rows.map((row) => {
               if (row.kind === "week") {
                 return (
-                  <tr key={`wk-${row.label}`} className="bg-primary/10 font-semibold">
-                    <td className="sticky left-0 z-10 whitespace-nowrap border-b border-border bg-[#1a1f33] px-4 py-2.5">
+                  <tr key={`wk-${row.label}`} className="bg-[#262d55] font-semibold [&>td]:border-y [&>td]:border-primary/50">
+                    <td className="sticky left-0 z-10 whitespace-nowrap border-l-4 !border-l-primary bg-[#262d55] px-4 py-2.5 text-primary">
                       {row.label}
-                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                      <span className="ml-1.5 text-xs font-normal text-primary/70">
                         {row.avg.days ? `(${row.avg.days} ${row.avg.days === 1 ? "dia" : "dias"})` : "(sem dados)"}
                       </span>
                     </td>
